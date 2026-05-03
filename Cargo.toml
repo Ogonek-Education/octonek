@@ -1,0 +1,13 @@
+[package]
+name = "ogonek-gh"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.102"
+dotenvy = "0.15.7"
+log = "0.4.29"
+octocrab = "0.49.9"
+pretty_env_logger = "0.5.0"
+teloxide = { version = "0.17.0", features = ["macros", "rustls"] }
+tokio = { version = "1.52.1", features = ["rt-multi-thread", "macros"] }
