@@ -65,25 +65,25 @@ pub enum Command {
 pub async fn start(bot: Bot, msg: Message, dialogue: MyDialogue) -> HandlerResult {
     if !is_authorized(&msg) {
         warn!("Unauthorized access attempt");
-        bot.send_message(msg.chat.id, "Unauthorized.").await?;
+        send_reply(&bot, &msg, "Unauthorized.").await?;
         return Ok(());
     }
     info!("Bot started");
-    bot.send_message(msg.chat.id, "Send /newissue to start creating a GitHub issue.").await?;
+    send_reply(&bot, &msg, "Send /newissue to start creating a GitHub issue.").await?;
     dialogue.exit().await?;
     Ok(())
 }
 
 #[instrument(skip(bot))]
 pub async fn help(bot: Bot, msg: Message) -> HandlerResult {
-    bot.send_message(msg.chat.id, Command::descriptions().to_string()).await?;
+    send_reply(&bot, &msg, Command::descriptions().to_string()).await?;
     Ok(())
 }
 
 #[instrument(skip(bot, dialogue))]
 pub async fn cancel(bot: Bot, msg: Message, dialogue: MyDialogue) -> HandlerResult {
     info!("Operation cancelled");
-    bot.send_message(msg.chat.id, "Cancelled.")
+    send_reply(&bot, &msg, "Cancelled.")
         .reply_markup(KeyboardRemove::new())
         .await?;
     dialogue.exit().await?;
@@ -94,11 +94,11 @@ pub async fn cancel(bot: Bot, msg: Message, dialogue: MyDialogue) -> HandlerResu
 pub async fn new_issue(bot: Bot, msg: Message, dialogue: MyDialogue) -> HandlerResult {
     if !is_authorized(&msg) {
         warn!("Unauthorized /newissue attempt");
-        bot.send_message(msg.chat.id, "Unauthorized.").await?;
+        send_reply(&bot, &msg, "Unauthorized.").await?;
         return Ok(());
     }
     info!("Starting new issue wizard");
-    bot.send_message(msg.chat.id, "What is the title of the issue?").await?;
+    send_reply(&bot, &msg, "What is the title of the issue?").await?;
     dialogue.update(State::ReceiveTitle).await?;
     Ok(())
 }
@@ -115,7 +115,7 @@ pub async fn receive_title(bot: Bot, msg: Message, dialogue: MyDialogue) -> Hand
     let types = vec!["Bug", "Feature", "Enhancement", "Documentation", "Task"];
     let keyboard = make_keyboard(types, 2);
 
-    bot.send_message(msg.chat.id, "Select Issue Type:")
+    send_reply(&bot, &msg, "Select Issue Type:")
         .reply_markup(keyboard)
         .await?;
     
@@ -129,7 +129,7 @@ pub async fn receive_issue_type(bot: Bot, msg: Message, dialogue: MyDialogue, mu
     let valid_types = vec!["Bug", "Feature", "Enhancement", "Documentation", "Task"];
     
     if !valid_types.contains(&issue_type.as_str()) {
-        bot.send_message(msg.chat.id, "Invalid type. Please select from the keyboard.").await?;
+        send_reply(&bot, &msg, "Invalid type. Please select from the keyboard.").await?;
         return Ok(());
     }
 
@@ -142,14 +142,14 @@ pub async fn receive_issue_type(bot: Bot, msg: Message, dialogue: MyDialogue, mu
             let mut options = labels;
             options.push("Done (No more labels)".to_string());
             let keyboard = make_keyboard(options.iter().map(|s| s.as_str()).collect(), 2);
-            bot.send_message(msg.chat.id, "Select Labels (one by one):")
+            send_reply(&bot, &msg, "Select Labels (one by one):")
                 .reply_markup(keyboard)
                 .await?;
             dialogue.update(State::ReceiveLabels { data }).await?;
         }
         Err(e) => {
             warn!(error = ?e, "Failed to fetch labels, skipping labels step");
-            bot.send_message(msg.chat.id, "As a... (Role)")
+            send_reply(&bot, &msg, "As a... (Role)")
                 .reply_markup(KeyboardRemove::new())
                 .await?;
             dialogue.update(State::ReceiveRole { data }).await?;
@@ -164,14 +164,14 @@ pub async fn receive_labels(bot: Bot, msg: Message, dialogue: MyDialogue, mut da
     
     if label == "Done (No more labels)" {
         info!(labels = ?data.labels, "Finished selecting labels");
-        bot.send_message(msg.chat.id, "As a... (Role)")
+        send_reply(&bot, &msg, "As a... (Role)")
             .reply_markup(KeyboardRemove::new())
             .await?;
         dialogue.update(State::ReceiveRole { data }).await?;
     } else {
         info!(label = %label, "Added label");
         data.labels.push(label);
-        bot.send_message(msg.chat.id, format!("Added {}. Select another or 'Done'.", data.labels.last().unwrap())).await?;
+        send_reply(&bot, &msg, format!("Added {}. Select another or 'Done'.", data.labels.last().unwrap())).await?;
         dialogue.update(State::ReceiveLabels { data }).await?;
     }
     Ok(())
@@ -181,7 +181,7 @@ pub async fn receive_labels(bot: Bot, msg: Message, dialogue: MyDialogue, mut da
 pub async fn receive_role(bot: Bot, msg: Message, dialogue: MyDialogue, mut data: IssueData) -> HandlerResult {
     data.role = msg.text().unwrap_or_default().to_string();
     info!(role = %data.role, "Received role");
-    bot.send_message(msg.chat.id, "I need... (Function)").await?;
+    send_reply(&bot, &msg, "I need... (Function)").await?;
     dialogue.update(State::ReceiveFunction { data }).await?;
     Ok(())
 }
@@ -190,7 +190,7 @@ pub async fn receive_role(bot: Bot, msg: Message, dialogue: MyDialogue, mut data
 pub async fn receive_function(bot: Bot, msg: Message, dialogue: MyDialogue, mut data: IssueData) -> HandlerResult {
     data.function = msg.text().unwrap_or_default().to_string();
     info!(function = %data.function, "Received function");
-    bot.send_message(msg.chat.id, "So that... (Benefit)").await?;
+    send_reply(&bot, &msg, "So that... (Benefit)").await?;
     dialogue.update(State::ReceiveBenefit { data }).await?;
     Ok(())
 }
@@ -199,7 +199,7 @@ pub async fn receive_function(bot: Bot, msg: Message, dialogue: MyDialogue, mut 
 pub async fn receive_benefit(bot: Bot, msg: Message, dialogue: MyDialogue, mut data: IssueData) -> HandlerResult {
     data.benefit = msg.text().unwrap_or_default().to_string();
     info!(benefit = %data.benefit, "Received benefit");
-    bot.send_message(msg.chat.id, "Details and Assumptions:").await?;
+    send_reply(&bot, &msg, "Details and Assumptions:").await?;
     dialogue.update(State::ReceiveDetails { data }).await?;
     Ok(())
 }
@@ -208,7 +208,7 @@ pub async fn receive_benefit(bot: Bot, msg: Message, dialogue: MyDialogue, mut d
 pub async fn receive_details(bot: Bot, msg: Message, dialogue: MyDialogue, mut data: IssueData) -> HandlerResult {
     data.details = msg.text().unwrap_or_default().to_string();
     info!("Received details");
-    bot.send_message(msg.chat.id, "Acceptance Criteria (Gherkin style):").await?;
+    send_reply(&bot, &msg, "Acceptance Criteria (Gherkin style):").await?;
     dialogue.update(State::ReceiveAcceptanceCriteria { data }).await?;
     Ok(())
 }
@@ -227,16 +227,16 @@ pub async fn receive_acceptance_criteria(bot: Bot, msg: Message, dialogue: MyDia
         data.role, data.function, data.benefit, data.details, data.acceptance_criteria
     );
 
-    bot.send_message(msg.chat.id, "Creating issue...").await?;
+    send_reply(&bot, &msg, "Creating issue...").await?;
 
     match github::create_issue(&data.title, &body, all_labels).await {
         Ok(url) => {
             info!(url = %url, "Issue created successfully");
-            bot.send_message(msg.chat.id, format!("Issue created and added to project: {}", url)).await?;
+            send_reply(&bot, &msg, format!("Issue created and added to project: {}", url)).await?;
         }
         Err(e) => {
             tracing::error!(error = ?e, "Failed to create issue");
-            bot.send_message(msg.chat.id, format!("Failed to create issue: {}", e)).await?;
+            send_reply(&bot, &msg, format!("Failed to create issue: {}", e)).await?;
         }
     }
 
@@ -251,6 +251,15 @@ fn make_keyboard(options: Vec<&str>, width: usize) -> KeyboardMarkup {
         keyboard.push(row);
     }
     KeyboardMarkup::new(keyboard).one_time_keyboard().resize_keyboard()
+}
+
+/// Helper to send a message to the same chat and thread (topic) as the received message.
+fn send_reply(bot: &Bot, msg: &Message, text: impl Into<String>) -> teloxide::requests::JsonRequest<teloxide::payloads::SendMessage> {
+    let mut req = bot.send_message(msg.chat.id, text);
+    if let Some(thread_id) = msg.thread_id {
+        req = req.message_thread_id(thread_id);
+    }
+    req
 }
 
 fn is_authorized(msg: &Message) -> bool {
