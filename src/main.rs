@@ -40,6 +40,7 @@ async fn main() {
 }
 
 fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync>> {
+    use crate::bot::is_authorized;
     use dptree::case;
 
     let command_handler = teloxide::filter_command::<Command, _>()
@@ -48,7 +49,16 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync>> {
         .branch(case![Command::Cancel].endpoint(cancel));
 
     let message_handler = Update::filter_message()
+        .filter(|msg: Message| is_authorized(&msg))
         .branch(command_handler)
+        .branch(
+            dptree::filter(|msg: Message| {
+                msg.text()
+                    .map(|t| t.to_lowercase() == "cancel")
+                    .unwrap_or(false)
+            })
+            .endpoint(cancel),
+        )
         .branch(case![State::Start].endpoint(start))
         .branch(case![State::ReceiveTitle].endpoint(receive_title))
         .branch(case![State::ReceiveIssueType { data }].endpoint(receive_issue_type))

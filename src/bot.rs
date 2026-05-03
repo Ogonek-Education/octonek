@@ -63,11 +63,6 @@ pub enum Command {
 
 #[instrument(skip(bot, dialogue), fields(chat_id = %msg.chat.id, user = ?msg.from))]
 pub async fn start(bot: Bot, msg: Message, dialogue: MyDialogue) -> HandlerResult {
-    if !is_authorized(&msg) {
-        warn!("Unauthorized access attempt");
-        send_reply(&bot, &msg, "Unauthorized.").await?;
-        return Ok(());
-    }
     info!("Bot started");
     send_reply(&bot, &msg, "Send /newissue to start creating a GitHub issue.").await?;
     dialogue.exit().await?;
@@ -92,11 +87,6 @@ pub async fn cancel(bot: Bot, msg: Message, dialogue: MyDialogue) -> HandlerResu
 
 #[instrument(skip(bot, dialogue), fields(chat_id = %msg.chat.id, user = ?msg.from))]
 pub async fn new_issue(bot: Bot, msg: Message, dialogue: MyDialogue) -> HandlerResult {
-    if !is_authorized(&msg) {
-        warn!("Unauthorized /newissue attempt");
-        send_reply(&bot, &msg, "Unauthorized.").await?;
-        return Ok(());
-    }
     info!("Starting new issue wizard");
     send_reply(&bot, &msg, "What is the title of the issue?").await?;
     dialogue.update(State::ReceiveTitle).await?;
@@ -112,7 +102,7 @@ pub async fn receive_title(bot: Bot, msg: Message, dialogue: MyDialogue) -> Hand
         ..Default::default()
     };
     
-    let types = vec!["Bug", "Feature", "Enhancement", "Documentation", "Task"];
+    let types = vec!["Bug", "Feature", "Enhancement", "Documentation", "Task", "Cancel"];
     let keyboard = make_keyboard(types, 2);
 
     send_reply(&bot, &msg, "Select Issue Type:")
@@ -141,6 +131,7 @@ pub async fn receive_issue_type(bot: Bot, msg: Message, dialogue: MyDialogue, mu
         Ok(labels) => {
             let mut options = labels;
             options.push("Done (No more labels)".to_string());
+            options.push("Cancel".to_string());
             let keyboard = make_keyboard(options.iter().map(|s| s.as_str()).collect(), 2);
             send_reply(&bot, &msg, "Select Labels (one by one):")
                 .reply_markup(keyboard)
@@ -262,7 +253,7 @@ fn send_reply(bot: &Bot, msg: &Message, text: impl Into<String>) -> teloxide::re
     req
 }
 
-fn is_authorized(msg: &Message) -> bool {
+pub fn is_authorized(msg: &Message) -> bool {
     let user_id = msg.from.as_ref().map(|u| u.id.0).unwrap_or(0);
     let chat_id = msg.chat.id.0;
     let thread_id = msg.thread_id.map(|id| id.0.0).unwrap_or(0);
