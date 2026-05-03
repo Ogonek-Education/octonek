@@ -263,48 +263,16 @@ fn send_reply(bot: &Bot, msg: &Message, text: impl Into<String>) -> teloxide::re
 }
 
 fn is_authorized(msg: &Message) -> bool {
+    let user_id = msg.from.as_ref().map(|u| u.id.0).unwrap_or(0);
     let chat_id = msg.chat.id.0;
     let thread_id = msg.thread_id.map(|id| id.0.0).unwrap_or(0);
-    let user_id = msg.from.as_ref().map(|u| u.id.0).unwrap_or(0);
 
-    info!(chat_id = %chat_id, thread_id = %thread_id, user_id = %user_id, "Checking authorization");
-
-    // Check Chat ID
-    let target_chat_id_str = std::env::var("TARGET_CHAT_ID").unwrap_or_default();
-    if !target_chat_id_str.is_empty() {
-        match target_chat_id_str.trim().parse::<i64>() {
-            Ok(target_id) => {
-                if target_id != chat_id {
-                    warn!(target = %target_id, actual = %chat_id, "Chat ID mismatch");
-                    return false;
-                }
-            }
-            Err(e) => {
-                warn!(target = %target_chat_id_str, error = ?e, "Failed to parse TARGET_CHAT_ID");
-            }
-        }
-    }
-
-    // Check Thread ID (Topic)
-    let target_thread_id_str = std::env::var("TARGET_THREAD_ID").unwrap_or_default();
-    if !target_thread_id_str.is_empty() {
-        match target_thread_id_str.trim().parse::<i32>() {
-            Ok(target_id) => {
-                if target_id != thread_id {
-                    warn!(target = %target_id, actual = %thread_id, "Thread ID mismatch");
-                    return false;
-                }
-            }
-            Err(e) => {
-                warn!(target = %target_thread_id_str, error = ?e, "Failed to parse TARGET_THREAD_ID");
-            }
-        }
-    }
+    info!(user_id = %user_id, chat_id = %chat_id, thread_id = %thread_id, "Checking authorization");
 
     // Check User ID
     let allowed_ids_str = std::env::var("ALLOWED_USER_IDS").unwrap_or_default();
     if allowed_ids_str.is_empty() {
-        info!("No ALLOWED_USER_IDS set, allowing all users in target chat/thread");
+        info!("No ALLOWED_USER_IDS set, allowing all users");
         return true;
     }
 
